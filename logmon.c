@@ -4,10 +4,7 @@
 #include <string.h>
 #include <stdint.h>
 
-typedef struct {
-	uint32_t	line_count;
-	char		**logs;
-} log_t;
+#define MAX_SIZE 2048
 
 typedef enum {
 	ERR_TYPE_OK = 0,
@@ -15,54 +12,107 @@ typedef enum {
 	ERR_TYPE_NOEXIST = 2
 } err_t;
 
+typedef enum {
+	LOG_TYPE_SYSTEM = 0,
+	LOG_TYPE_KERNEL = 1
+} log_t;
+
+typedef struct {
+	log_t		type;
+	uint32_t	line_count;
+	char		**logs;
+} log_data_t;
+
+log_data_t log_datas[2];
+
+static char log_type[2][12] = {"syslog", "kernel"};
+static char log_files[2][32] = {"/var/log/syslog", "/var/log/kern.log"};
+
 static uint32_t
 get_log_line_count(const char *log_path)
 {
 	FILE		*fp;
-	char		buf[2048];
+	char		buf[MAX_SIZE];
 	uint32_t	line_count;
 
 	line_count = 0;
 	
 	fp = fopen(log_path, "r");
-	while (fgets(buf, 2048, fp)) {
+	while (fgets(buf, MAX_SIZE, fp)) {
 		line_count++;
 	}
 	fclose(fp);
 	return line_count;
 }
 
-static err_t
-get_log(const char *log_type, const char *log_path)
+static char *
+get_log_path(log_t log_type)
 {
-	FILE	*fp;
-	char	buf[2048];
-	bool	is_printed;
+	switch (log_type) {
+	case LOG_TYPE_SYSTEM:
+		return log_files[0];
+	case LOG_TYPE_KERNEL:
+		return log_files[1];
+	}
+}
+
+static err_t
+get_log(log_t type)
+{
+	FILE		*fp;
+	char		buf[MAX_SIZE], *log_path;
+	bool		is_printed;
+	uint32_t	log_count, idx;
 
 	is_printed = false;
+	log_path = get_log_path(type);
+	log_count = get_log_line_count(log_path);
 	fp = fopen(log_path, "r");
 	if (fp == NULL) {
-		printf("[%s] Failed to open log file\n", log_type);
+		printf("[%s] Failed to open log file\n", log_type[type]);
 		return ERR_TYPE_NOEXIST;
 	}
 
-	while (fgets(buf, 2048, fp)) {
-		printf("[%s] %s", log_type, buf);
+	log_datas[type].logs = calloc(log_count, sizeof(char *));
+	log_datas[type].line_count = log_count;
+	log_datas[type].type = type;
+
+	for (idx = 0; idx < log_count; idx++) {
+		log_datas[type].logs[idx] = calloc(MAX_SIZE, sizeof(char));
+	}
+
+	idx = 0;
+	while (fgets(buf, MAX_SIZE, fp)) {
+		snprintf(log_datas[type].logs[idx], MAX_SIZE, "[%s] %s", log_type[type], buf);
 		is_printed = true;
+		idx++;
 	}
 
 	fclose(fp);
 	
 	if (!is_printed) {
-		printf("[%s] Not-existent Log\n", log_type);
+		printf("[%s] Not-existent Log\n", log_type[type]);
 	}
 	return ERR_TYPE_OK;
+}
+
+static void
+print_log(log_t type)
+{
+	uint32_t log_count, idx;
+
+	log_count = log_datas[type].line_count;
+
+	for (idx = 0; idx < log_count; idx++) {
+		printf("%s", log_datas[type].logs[idx]);
+	}
 }
 
 int
 main(int argc, char **argv)
 {
-	err_t	err;
+	uint32_t	idx;
+	err_t		err;
 	
 	err = ERR_TYPE_OK;
 
@@ -72,13 +122,11 @@ main(int argc, char **argv)
 		exit(ERR_TYPE_INVALID);
 	}
 
-	if (strcasecmp(argv[1], "syslog") == 0) {
-		err = get_log("syslog", "/var/log/syslog");
+	for (idx = 0; idx <= 1; idx++) {
+		if (strcasecmp(argv[1], log_type[idx]) == 0) {
+			err = get_log(idx);
+			print_log(idx);	
+		}
 	}
-
-	if (strcasecmp(argv[1], "kernel") == 0) {
-		err = get_log("kernel", "/var/log/kern.log");
-	}
-	
 	exit(err);
 }

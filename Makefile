@@ -6,10 +6,10 @@ TARGET=logmon
 all : $(TARGET)
 
 $(TARGET) : $(OBJS)
-	$(CC) -o $@ $(OBJS)
+	$(CC) -g -o $@ $(OBJS)
 
 $(OBJS) :
-	$(CC) -c $(SRCS)
+	$(CC) -g -c $(SRCS)
 
 clean:
 	rm -f $(OBJS) $(TARGET)
