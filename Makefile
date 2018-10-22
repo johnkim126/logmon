@@ -1,4 +1,4 @@
-C=gcc
+CC=gcc
 OBJS=logmon.o
 SRCS=logmon.c
 TARGET=logmon

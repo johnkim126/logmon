@@ -18,9 +18,16 @@ typedef enum {
 } log_t;
 
 typedef struct {
+	char		*month;
+	char		*day;
+	char		*time;
+	char		*log;
+} log_info_t;
+
+typedef struct {
 	log_t		type;
 	uint32_t	line_count;
-	char		**logs;
+	log_info_t	*infos;
 } log_data_t;
 
 log_data_t log_datas[2];
@@ -61,6 +68,8 @@ get_log(log_t type)
 {
 	FILE		*fp;
 	char		buf[MAX_SIZE], *log_path;
+	char		*str_origin, *ptr_str_origin;
+	char		*month, *day, *time, *hostname;
 	bool		is_printed;
 	uint32_t	log_count, idx;
 
@@ -73,17 +82,31 @@ get_log(log_t type)
 		return ERR_TYPE_NOEXIST;
 	}
 
-	log_datas[type].logs = calloc(log_count, sizeof(char *));
+	log_datas[type].infos = malloc(log_count * sizeof(log_info_t));
 	log_datas[type].line_count = log_count;
 	log_datas[type].type = type;
 
 	for (idx = 0; idx < log_count; idx++) {
-		log_datas[type].logs[idx] = calloc(MAX_SIZE, sizeof(char));
+		log_datas[type].infos[idx].log = malloc(MAX_SIZE * sizeof(char));
 	}
 
 	idx = 0;
 	while (fgets(buf, MAX_SIZE, fp)) {
-		snprintf(log_datas[type].logs[idx], MAX_SIZE, "[%s] %s", log_type[type], buf);
+		str_origin = strdup(buf);
+		ptr_str_origin = str_origin;
+
+		month = strtok(buf, " \n");
+		day = strtok(NULL, " \n");
+		time = strtok(NULL, " \n");
+		hostname = strtok(NULL, " \n");
+
+		ptr_str_origin += strlen(month) + strlen(day) + strlen(time) + strlen(hostname) + 4;
+		log_datas[type].infos[idx].month = strdup(month);
+		log_datas[type].infos[idx].day = strdup(day);
+		log_datas[type].infos[idx].time = strdup(time);
+		snprintf(log_datas[type].infos[idx].log, MAX_SIZE, "[%s] %s", log_type[type], ptr_str_origin);
+
+		free(str_origin);
 		is_printed = true;
 		idx++;
 	}
@@ -104,7 +127,10 @@ print_log(log_t type)
 	log_count = log_datas[type].line_count;
 
 	for (idx = 0; idx < log_count; idx++) {
-		printf("%s", log_datas[type].logs[idx]);
+		printf("[Date: %s %s] %s", 
+			log_datas[type].infos[idx].month, 
+			log_datas[type].infos[idx].day, 
+			log_datas[type].infos[idx].log);
 	}
 }
 
